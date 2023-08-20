@@ -1,6 +1,10 @@
 mod tokenizer;
+mod parser;
 
 use std::io::{self, Write};
+
+use tokenizer::Tokenizer;
+use parser::Parser;
 
 fn main() {
     loop {
@@ -11,7 +15,7 @@ fn main() {
         stdin.read_line(&mut buffer).expect("Failed to read line");
 
         match buffer.trim() {
-            special_cmd if special_cmd.starts_with(".") => match special_cmd {
+            special_cmd if special_cmd.starts_with('.') => match special_cmd {
                 ".exit" => std::process::exit(0),
                 cmd => {
                     eprintln!("Unrecognized command: {}", cmd)
@@ -24,33 +28,9 @@ fn main() {
     }
 }
 
-enum Statement {
-    Select,
-    Insert,
-}
-
-struct SelectStatement {
-    columns: Vec<String>,
-    table: String,
-    r#where: WhereClause,
-    pagination: Pagination,
-}
-
-struct Pagination {
-    limit: usize,
-    offset: usize,
-}
-
-struct WhereClause {}
-
-fn execute_sql(sql: &str) -> Statement {
-    if sql.to_lowercase().starts_with("select") {
-        return Statement::Select;
-    }
-
-    if sql.to_lowercase().starts_with("insert") {
-        return Statement::Insert;
-    }
-
-    panic!("Invalid sql statement");
+fn execute_sql(sql: &str) {
+    let tokens = Tokenizer::parse(sql);
+    let parser = Parser::new(tokens);
+    let statement = parser.parse();
+    println!("{:?}", statement);
 }

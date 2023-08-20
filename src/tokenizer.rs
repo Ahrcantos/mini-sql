@@ -1,25 +1,25 @@
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     UnknownKeyword(String),
     NoMatch,
 }
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
-struct Span {
+pub struct Span {
     start: usize,
     end: usize,
 }
 
 #[derive(Debug, PartialEq)]
-struct Token {
-    span: Span,
-    kind: TokenKind,
+pub struct Token {
+    pub span: Span,
+    pub kind: TokenKind,
 }
 
 #[derive(Debug, PartialEq)]
-enum TokenKind {
+pub enum TokenKind {
     Keyword(Keyword),
     Comma,
     Equals,
@@ -35,7 +35,7 @@ enum TokenKind {
 }
 
 #[derive(Debug, PartialEq)]
-enum Keyword {
+pub enum Keyword {
     Select,
     From,
     Insert,
@@ -43,7 +43,7 @@ enum Keyword {
     Where,
 }
 
-struct Tokenizer {}
+pub struct Tokenizer {}
 
 impl Tokenizer {
     pub fn parse(input: &str) -> Vec<Token> {
@@ -51,7 +51,7 @@ impl Tokenizer {
         let mut current_position = input;
         let mut offset = 0;
 
-        while current_position.len() > 0 {
+        while !current_position.is_empty() {
             if let Ok((rest, token)) = Self::whitespace((offset, current_position)) {
                 current_position = rest;
                 offset = token.span.end;
@@ -67,6 +67,13 @@ impl Tokenizer {
             }
 
             if let Ok((rest, token)) = Self::identifier((offset, current_position)) {
+                current_position = rest;
+                offset = token.span.end;
+                output.push(token);
+                continue;
+            }
+
+            if let Ok((rest, token)) = Self::string((offset, current_position)) {
                 current_position = rest;
                 offset = token.span.end;
                 output.push(token);
@@ -94,7 +101,7 @@ impl Tokenizer {
             }
         }
 
-        return output;
+        output
     }
 
     fn keyword((offset, input): (usize, &str)) -> Result<(&str, Token)> {
@@ -150,7 +157,20 @@ impl Tokenizer {
             ));
         }
 
-        return Err(Error::UnknownKeyword(String::from("idk")));
+        if input.to_lowercase().starts_with("values") {
+            return Ok((
+                &input[6..],
+                Token {
+                    span: Span {
+                        start: offset,
+                        end: offset + 6,
+                    },
+                    kind: TokenKind::Keyword(Keyword::Values),
+                },
+            ));
+        }
+
+        Err(Error::UnknownKeyword(String::from("idk")))
     }
 
     fn whitespace((position, input): (usize, &str)) -> Result<(&str, Token)> {
@@ -177,13 +197,13 @@ impl Tokenizer {
             }
         }
 
-        return Ok((
+        Ok((
             current,
             Token {
                 span: Span { start, end },
                 kind: TokenKind::Whitespace,
             },
-        ));
+        ))
     }
 
     fn special((position, input): (usize, &str)) -> Result<(&str, Token)> {
@@ -212,7 +232,35 @@ impl Tokenizer {
             }))
         }
 
-        return Err(Error::NoMatch);
+        if &input[0..2] == ">=" {
+            return Ok((&input[2..], Token {
+                span: Span { start: position, end: position + 2 },
+                kind: TokenKind::GreaterThanEquals,
+            }))
+        }
+
+        if &input[0..1] == ">" {
+            return Ok((&input[1..], Token {
+                span: Span { start: position, end: position + 1 },
+                kind: TokenKind::GreaterThan,
+            }))
+        }
+
+        if &input[0..2] == "<=" {
+            return Ok((&input[2..], Token {
+                span: Span { start: position, end: position + 2 },
+                kind: TokenKind::SmallerThanEquals,
+            }))
+        }
+
+        if &input[0..1] == "<" {
+            return Ok((&input[1..], Token {
+                span: Span { start: position, end: position + 1 },
+                kind: TokenKind::SmallerThan,
+            }))
+        }
+
+        Err(Error::NoMatch)
     }
 
     fn identifier((position, input): (usize, &str)) -> Result<(&str, Token)> {
@@ -244,7 +292,39 @@ impl Tokenizer {
             }
         }
 
-        return Err(Error::NoMatch);
+        Err(Error::NoMatch)
+    }
+
+    fn string((position, input): (usize, &str)) -> Result<(&str, Token)> {
+        let mut value = String::new();
+        let mut current_position = input;
+        let start = position;
+        let mut end = position;
+
+        for (i, char) in input.chars().enumerate() {
+            if i == 0 && char != '\"' {
+                return Err(Error::NoMatch);
+            }
+
+            end += 1;
+            current_position = &current_position[1..];
+
+            if i != 0 && char == '\"' {
+                return Ok((
+                    current_position,
+                    Token {
+                        span: Span { start, end },
+                        kind: TokenKind::String(value),
+                    },
+                ));
+            }
+
+            if char != '\"' {
+                value.push(char)
+            }
+        }
+
+        Err(Error::NoMatch)
     }
 
     fn number((position, input): (usize, &str)) -> Result<(&str, Token)> {
@@ -272,10 +352,10 @@ impl Tokenizer {
 
         let n: u32 = number.parse().expect("Failed to parse number. Probably too big");
 
-        return Ok((current, Token {
+        Ok((current, Token {
             span: Span { start, end },
             kind: TokenKind::Integer(n),
-        }));
+        }))
     }
 }
 
