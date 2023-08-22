@@ -10,12 +10,24 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Statement {
     Select(SelectStatement),
+    Insert(InsertStatement),
 }
 
 #[derive(Debug)]
 pub struct SelectStatement {
-    columns: Vec<String>,
-    table: String,
+    pub columns: Vec<String>,
+    pub table: String,
+}
+
+#[derive(Debug)]
+pub struct InsertStatement {
+    pub table: String,
+    pub values: Vec<Value>,
+}
+#[derive(Debug)]
+pub enum Value {
+    String(String),
+    Int(u32),
 }
 
 #[derive(Debug)]
@@ -31,9 +43,91 @@ impl Parser {
     pub fn parse(&self) -> Result<Statement> {
         let tokens = self.tokens.as_slice();
 
-        let (_, statement) = Self::select_statement(tokens)?;
+        if let Ok((_, statement)) = Self::select_statement(tokens) {
+            return Ok(Statement::Select(statement));
+        }
 
-        Ok(Statement::Select(statement))
+        if let Ok((_, statement)) = Self::insert_statement(tokens) {
+            return Ok(Statement::Insert(statement));
+        }
+
+        Err(Error::NoMatch)
+    }
+
+    fn insert_statement(input: &[Token]) -> Result<(&[Token], InsertStatement)> {
+        let (rest, _) = Self::insert_keyword(input)?;
+        let (rest, _) = Self::into_keyword(rest)?;
+        let (rest, table) = Self::table_name(rest)?;
+        let (rest, _) = Self::values_keyword(rest)?;
+        let (rest, values) = Self::values(rest)?;
+
+        Ok((rest, InsertStatement { table, values }))
+    }
+
+    fn values_keyword(input: &[Token]) -> Result<(&[Token], ())> {
+        let mut cutoff = 0;
+
+        if let Some(Token {
+            kind: TokenKind::Whitespace,
+            ..
+        }) = input.get(cutoff)
+        {
+            cutoff += 1;
+        }
+
+        if let Some(Token {
+            kind: TokenKind::Keyword(Keyword::Values),
+            ..
+        }) = input.get(cutoff)
+        {
+            Ok((&input[cutoff + 1..], ()))
+        } else {
+            Err(Error::NoMatch)
+        }
+    }
+
+    fn insert_keyword(input: &[Token]) -> Result<(&[Token], ())> {
+        let mut cutoff = 0;
+
+        if let Some(Token {
+            kind: TokenKind::Whitespace,
+            ..
+        }) = input.get(cutoff)
+        {
+            cutoff += 1;
+        }
+
+        if let Some(Token {
+            kind: TokenKind::Keyword(Keyword::Insert),
+            ..
+        }) = input.get(cutoff)
+        {
+            Ok((&input[cutoff + 1..], ()))
+        } else {
+            Err(Error::NoMatch)
+        }
+    }
+
+    fn into_keyword(input: &[Token]) -> Result<(&[Token], ())> {
+        let mut cutoff = 0;
+
+        if let Some(Token {
+            kind: TokenKind::Whitespace,
+            ..
+        }) = input.get(cutoff)
+        {
+            cutoff += 1;
+        }
+
+        if let Some(Token {
+            kind: TokenKind::Keyword(Keyword::Into),
+            ..
+        }) = input.get(cutoff)
+        {
+            Ok((&input[cutoff + 1..], ()))
+        } else {
+            Err(Error::NoMatch)
+        }
     }
 
     fn select_statement(input: &[Token]) -> Result<(&[Token], SelectStatement)> {
@@ -41,35 +135,35 @@ impl Parser {
         let (rest, columns) = Self::columns(rest)?;
         let (rest, _) = Self::from_keyword(rest)?;
         let (rest, table) = Self::table_name(rest)?;
-        Ok((
-            rest,
-            SelectStatement {
-                columns,
-                table,
-            },
-        ))
+        Ok((rest, SelectStatement { columns, table }))
     }
 
     fn table_name(input: &[Token]) -> Result<(&[Token], String)> {
         let mut position = input;
 
-        if let Some(Token { kind: TokenKind::Whitespace, .. }) = position.get(0) {
+        if let Some(Token {
+            kind: TokenKind::Whitespace,
+            ..
+        }) = position.get(0)
+        {
             position = &position[1..];
         }
 
-        if let Some(Token { kind: TokenKind::Identifier(table), ..}) = position.get(0) {
-
+        if let Some(Token {
+            kind: TokenKind::Identifier(table),
+            ..
+        }) = position.get(0)
+        {
             match position.get(1) {
-                Some(Token { kind: TokenKind::Whitespace, ..}) => Ok((&position[2..], table.clone())),
-                _ => Ok((&position[1..], table.clone()))
+                Some(Token {
+                    kind: TokenKind::Whitespace,
+                    ..
+                }) => Ok((&position[2..], table.clone())),
+                _ => Ok((&position[1..], table.clone())),
             }
-            
-
         } else {
             Err(Error::NoMatch)
         }
-
-
     }
 
     fn from_keyword(input: &[Token]) -> Result<(&[Token], ())> {
@@ -82,7 +176,6 @@ impl Parser {
         } else {
             Err(Error::NoMatch)
         }
-
     }
 
     fn select_keyword(input: &[Token]) -> Result<(&[Token], ())> {
@@ -95,6 +188,76 @@ impl Parser {
         } else {
             Err(Error::NoMatch)
         }
+    }
+
+    fn values(input: &[Token]) -> Result<(&[Token], Vec<Value>)> {
+        let mut position = input;
+        let mut values = Vec::new();
+        let mut expect_value = true;
+
+        while !position.is_empty() {
+            let token = position.get(0);
+
+            if let Some(Token {
+                kind: TokenKind::Whitespace,
+                ..
+            }) = token
+            {
+                position = &position[1..];
+                continue;
+            }
+
+            if let (
+                Some(Token {
+                    kind: TokenKind::String(value),
+                    ..
+                }),
+                true,
+            ) = (token, expect_value)
+            {
+                position = &position[1..];
+                values.push(Value::String(value.clone()));
+                expect_value = false;
+                continue;
+            }
+
+            if let (
+                Some(Token {
+                    kind: TokenKind::Integer(value),
+                    ..
+                }),
+                true,
+            ) = (token, expect_value)
+            {
+                position = &position[1..];
+                values.push(Value::Int(*value));
+                expect_value = false;
+                continue;
+            }
+
+            if let (
+                Some(Token {
+                    kind: TokenKind::Comma,
+                    ..
+                }),
+                false,
+            ) = (token, expect_value)
+            {
+                position = &position[1..];
+                expect_value = true;
+                continue;
+            }
+
+            if !expect_value {
+                break;
+            }
+        }
+
+        if values.is_empty() {
+            return Err(Error::NoMatch);
+        }
+
+        Ok((position, values))
     }
 
     fn columns(input: &[Token]) -> Result<(&[Token], Vec<String>)> {

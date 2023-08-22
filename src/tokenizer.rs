@@ -39,6 +39,7 @@ pub enum Keyword {
     Select,
     From,
     Insert,
+    Into,
     Values,
     Where,
 }
@@ -80,7 +81,7 @@ impl Tokenizer {
                 continue;
             }
 
-            if let Ok((rest ,token)) = Self::number((offset, current_position)) {
+            if let Ok((rest, token)) = Self::number((offset, current_position)) {
                 current_position = rest;
                 offset = token.span.end;
                 output.push(token);
@@ -170,6 +171,19 @@ impl Tokenizer {
             ));
         }
 
+        if input.to_lowercase().starts_with("into") {
+            return Ok((
+                &input[4..],
+                Token {
+                    span: Span {
+                        start: offset,
+                        end: offset + 4,
+                    },
+                    kind: TokenKind::Keyword(Keyword::Into),
+                },
+            ));
+        }
+
         Err(Error::UnknownKeyword(String::from("idk")))
     }
 
@@ -207,57 +221,95 @@ impl Tokenizer {
     }
 
     fn special((position, input): (usize, &str)) -> Result<(&str, Token)> {
-
-        if &input[0..1] == "," {
+        if input.get(0..1) == Some(",") {
             return Ok((
                 &input[1..],
                 Token {
-                    span: Span { start: position, end: position + 1 },
+                    span: Span {
+                        start: position,
+                        end: position + 1,
+                    },
                     kind: TokenKind::Comma,
                 },
-            ))
+            ));
         }
 
-        if &input[0..1] == "=" {
-            return Ok((&input[1..], Token {
-                span: Span { start: position, end: position + 1 },
-                kind: TokenKind::Equals,
-            }))
+        if input.get(0..1) == Some("=") {
+            return Ok((
+                &input[1..],
+                Token {
+                    span: Span {
+                        start: position,
+                        end: position + 1,
+                    },
+                    kind: TokenKind::Equals,
+                },
+            ));
         }
 
-        if &input[0..1] == ";" {
-            return Ok((&input[1..], Token {
-                span: Span { start: position, end: position + 1 },
-                kind: TokenKind::SemiColon,
-            }))
+        if input.get(0..1) == Some(";") {
+            return Ok((
+                &input[1..],
+                Token {
+                    span: Span {
+                        start: position,
+                        end: position + 1,
+                    },
+                    kind: TokenKind::SemiColon,
+                },
+            ));
         }
 
-        if &input[0..2] == ">=" {
-            return Ok((&input[2..], Token {
-                span: Span { start: position, end: position + 2 },
-                kind: TokenKind::GreaterThanEquals,
-            }))
+        if input.get(0..2) == Some(">=") {
+            return Ok((
+                &input[2..],
+                Token {
+                    span: Span {
+                        start: position,
+                        end: position + 2,
+                    },
+                    kind: TokenKind::GreaterThanEquals,
+                },
+            ));
         }
 
-        if &input[0..1] == ">" {
-            return Ok((&input[1..], Token {
-                span: Span { start: position, end: position + 1 },
-                kind: TokenKind::GreaterThan,
-            }))
+        if input.get(0..1) == Some(">") {
+            return Ok((
+                &input[1..],
+                Token {
+                    span: Span {
+                        start: position,
+                        end: position + 1,
+                    },
+                    kind: TokenKind::GreaterThan,
+                },
+            ));
         }
 
-        if &input[0..2] == "<=" {
-            return Ok((&input[2..], Token {
-                span: Span { start: position, end: position + 2 },
-                kind: TokenKind::SmallerThanEquals,
-            }))
+        if input.get(0..2) == Some("<=") {
+            return Ok((
+                &input[2..],
+                Token {
+                    span: Span {
+                        start: position,
+                        end: position + 2,
+                    },
+                    kind: TokenKind::SmallerThanEquals,
+                },
+            ));
         }
 
-        if &input[0..1] == "<" {
-            return Ok((&input[1..], Token {
-                span: Span { start: position, end: position + 1 },
-                kind: TokenKind::SmallerThan,
-            }))
+        if input.get(0..1) == Some("<") {
+            return Ok((
+                &input[1..],
+                Token {
+                    span: Span {
+                        start: position,
+                        end: position + 1,
+                    },
+                    kind: TokenKind::SmallerThan,
+                },
+            ));
         }
 
         Err(Error::NoMatch)
@@ -328,7 +380,6 @@ impl Tokenizer {
     }
 
     fn number((position, input): (usize, &str)) -> Result<(&str, Token)> {
-
         let mut number = String::new();
         let start = position;
         let mut end = position;
@@ -338,7 +389,6 @@ impl Tokenizer {
             if i == 0 && !char.is_numeric() {
                 return Err(Error::NoMatch);
             }
-
 
             if !char.is_numeric() {
                 break;
@@ -350,12 +400,17 @@ impl Tokenizer {
             number.push(char);
         }
 
-        let n: u32 = number.parse().expect("Failed to parse number. Probably too big");
+        let n: u32 = number
+            .parse()
+            .expect("Failed to parse number. Probably too big");
 
-        Ok((current, Token {
-            span: Span { start, end },
-            kind: TokenKind::Integer(n),
-        }))
+        Ok((
+            current,
+            Token {
+                span: Span { start, end },
+                kind: TokenKind::Integer(n),
+            },
+        ))
     }
 }
 

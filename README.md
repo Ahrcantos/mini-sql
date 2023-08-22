@@ -1,5 +1,16 @@
 
 
+
+## Plans
+
++ Table definition via format similar to JSON-Schema
+    - Nested tables
++ Basic SQL
+    - Select
+    - Insert
+    - Where
+    - Joins
+
 ## Resources
 
 
