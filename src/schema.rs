@@ -44,6 +44,10 @@ impl DatabaseSchema {
     pub fn get_table_schema(&self, name: &str) -> Option<&TableSchema> {
         self.tables.get(name)
     }
+
+    pub fn list_tables(&self) -> Vec<String> {
+        self.tables.keys().cloned().collect()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,6 +82,10 @@ impl TableSchema {
         }
 
         None
+    }
+
+    pub fn size(&self) -> usize {
+        self.columns.iter().map(|c| c.size()).sum()
     }
 }
 

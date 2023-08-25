@@ -4,17 +4,29 @@ mod schema;
 mod table;
 mod tokenizer;
 
-use std::io::{self, Write};
+use std::{io::{self, Write}, path::PathBuf};
 
-use parser::{Parser, Statement};
+use clap::Parser;
+
+use parser::Statement;
 use schema::{DatabaseSchema, TableSchema};
 use table::{Row, Table};
 use tokenizer::Tokenizer;
 
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    data_dir: PathBuf,
+}
+
 fn main() {
+    let args = Args::parse();
+    let schema_file = args.data_dir.join("./schema.json");
+
     let mut table = Table::new();
     let mut db_schema =
-        DatabaseSchema::load("data/schema.json").expect("Failed to load database schema");
+        DatabaseSchema::load(&schema_file).expect("Failed to load database schema");
 
     loop {
         let mut buffer = String::new();
@@ -31,6 +43,13 @@ fn main() {
                     std::process::exit(0);
                 },
 
+                ".list" => {
+                    let tables = db_schema.list_tables();
+                    for table in tables {
+                        println!("{}", table);
+                    }
+                },
+
                 cmd if cmd.starts_with(".create") => {
 
                     let args = cmd.split(' ').collect::<Vec<&str>>();
@@ -40,7 +59,7 @@ fn main() {
 
                     let schema = TableSchema::load(path).expect("Failed to load table schema");
                     db_schema.add_table(table_name, schema);
-                    db_schema.save("data/schema.json").expect("Failed to save schema");
+                    db_schema.save(&schema_file).expect("Failed to save schema");
                 },
 
                 cmd if cmd.starts_with(".table") => {
@@ -68,7 +87,7 @@ fn main() {
 
 fn execute_sql(sql: &str, table: &mut Table) {
     let tokens = Tokenizer::parse(sql);
-    let parser = Parser::new(tokens);
+    let parser = parser::Parser::new(tokens);
     let statement = parser.parse();
 
     match statement {
