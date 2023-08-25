@@ -29,11 +29,11 @@ fn main() {
                     table.flush();
                     std::mem::drop(table);
                     std::process::exit(0);
-                }
+                },
 
                 cmd if cmd.starts_with(".create") => {
 
-                    let args = cmd.split(" ").collect::<Vec<&str>>();
+                    let args = cmd.split(' ').collect::<Vec<&str>>();
 
                     let table_name = args.get(1).expect("Argument for table name was not provided");
                     let path = args.get(2).expect("Argument for path was not provided");
@@ -41,6 +41,19 @@ fn main() {
                     let schema = TableSchema::load(path).expect("Failed to load table schema");
                     db_schema.add_table(table_name, schema);
                     db_schema.save("data/schema.json").expect("Failed to save schema");
+                },
+
+                cmd if cmd.starts_with(".table") => {
+                    let args = cmd.split(' ').collect::<Vec<&str>>();
+                    let table_name = args.get(1).expect("Argument for table name was not provided");
+
+                    let schema = db_schema.get_table_schema(table_name);
+
+                    match schema {
+                        Some(schema) => { print!("{}", schema) },
+                        None => { eprintln!("Table \"{}\" does not exist!", &table_name)}
+                    }
+
                 },
                 cmd => {
                     eprintln!("Unrecognized command: {}", cmd)

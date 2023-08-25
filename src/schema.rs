@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::{collections::HashMap, path::Path};
@@ -28,7 +29,6 @@ impl DatabaseSchema {
     where
         P: AsRef<Path>,
     {
-
         let mut file = OpenOptions::new().write(true).open(&path)?;
 
         let content = serde_json::to_string_pretty(self)?;
@@ -39,6 +39,10 @@ impl DatabaseSchema {
 
     pub fn add_table(&mut self, name: &str, schema: TableSchema) {
         self.tables.insert(String::from(name), schema);
+    }
+
+    pub fn get_table_schema(&self, name: &str) -> Option<&TableSchema> {
+        self.tables.get(name)
     }
 }
 
@@ -52,7 +56,6 @@ impl TableSchema {
     where
         P: AsRef<Path>,
     {
-
         let mut file = File::open(&path)?;
 
         let mut content = String::new();
@@ -61,12 +64,63 @@ impl TableSchema {
         let value = serde_json::from_str(&content)?;
         Ok(value)
     }
+
+    pub fn offset(&self, column_name: &str) -> Option<usize> {
+
+        let mut total = 0;
+
+        for column in self.columns.iter() {
+            if column.name == column_name {
+                return Some(total)
+            } else {
+                total += column.size();
+            }
+        }
+
+        None
+    }
+}
+
+impl Display for TableSchema {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "{0: <16} | {1: <16} | {2: <6} | {3: <6}",
+            "column", "type", "size", "offset"
+        )?;
+        for column in self.columns.iter() {
+            let kind = match column.kind {
+                ColumnKind::Int => String::from("int"),
+                ColumnKind::String(StringColumn { length }) => format!("string({})", length),
+            };
+
+            let size = column.size();
+            let offset = self.offset(&column.name).unwrap();
+
+            writeln!(
+                f,
+                "{0: <16} | {1: <16} | {2: <6} | {3: <6}",
+                column.name, kind, size, offset
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Column {
     name: String,
     kind: ColumnKind,
+}
+
+impl Column {
+    pub fn size(&self) -> usize {
+        match self.kind {
+            ColumnKind::Int => 4,
+            ColumnKind::String(StringColumn { length }) => length,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
