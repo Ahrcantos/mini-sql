@@ -1,18 +1,20 @@
 mod pager;
 mod parser;
+mod schema;
 mod table;
 mod tokenizer;
 
 use std::io::{self, Write};
 
 use parser::{Parser, Statement};
-use table::Table;
+use schema::{DatabaseSchema, TableSchema};
+use table::{Row, Table};
 use tokenizer::Tokenizer;
-
-use crate::table::Row;
 
 fn main() {
     let mut table = Table::new();
+    let mut db_schema =
+        DatabaseSchema::load("data/schema.json").expect("Failed to load database schema");
 
     loop {
         let mut buffer = String::new();
@@ -28,6 +30,18 @@ fn main() {
                     std::mem::drop(table);
                     std::process::exit(0);
                 }
+
+                cmd if cmd.starts_with(".create") => {
+
+                    let args = cmd.split(" ").collect::<Vec<&str>>();
+
+                    let table_name = args.get(1).expect("Argument for table name was not provided");
+                    let path = args.get(2).expect("Argument for path was not provided");
+
+                    let schema = TableSchema::load(path).expect("Failed to load table schema");
+                    db_schema.add_table(table_name, schema);
+                    db_schema.save("data/schema.json").expect("Failed to save schema");
+                },
                 cmd => {
                     eprintln!("Unrecognized command: {}", cmd)
                 }
