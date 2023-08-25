@@ -1,3 +1,4 @@
+mod pager;
 mod parser;
 mod table;
 mod tokenizer;
@@ -22,7 +23,11 @@ fn main() {
 
         match buffer.trim() {
             special_cmd if special_cmd.starts_with('.') => match special_cmd {
-                ".exit" => std::process::exit(0),
+                ".exit" => {
+                    table.flush();
+                    std::mem::drop(table);
+                    std::process::exit(0);
+                }
                 cmd => {
                     eprintln!("Unrecognized command: {}", cmd)
                 }
@@ -41,7 +46,13 @@ fn execute_sql(sql: &str, table: &mut Table) {
 
     match statement {
         Ok(Statement::Select(_)) => {
-            println!("{}", &table);
+            let row = table.get_row(0);
+
+            if let Some(row) = row {
+                println!("{}", row);
+            } else {
+                println!("No data");
+            }
         }
         Ok(Statement::Insert(stmt)) => {
             let id = stmt.values.get(0);
