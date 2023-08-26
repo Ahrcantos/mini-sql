@@ -1,4 +1,5 @@
-use crate::tokenizer::{Keyword, Token, TokenKind};
+use super::tokenizer::{Keyword, Token, TokenKind};
+use super::{InsertStatement, SelectStatement, Selection, Statement, Value};
 
 #[derive(Debug)]
 pub enum Error {
@@ -6,29 +7,6 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug)]
-pub enum Statement {
-    Select(SelectStatement),
-    Insert(InsertStatement),
-}
-
-#[derive(Debug)]
-pub struct SelectStatement {
-    pub columns: Vec<String>,
-    pub table: String,
-}
-
-#[derive(Debug)]
-pub struct InsertStatement {
-    pub table: String,
-    pub values: Vec<Value>,
-}
-#[derive(Debug)]
-pub enum Value {
-    String(String),
-    Int(u32),
-}
 
 #[derive(Debug)]
 pub struct Parser {
@@ -61,7 +39,14 @@ impl Parser {
         let (rest, _) = Self::values_keyword(rest)?;
         let (rest, values) = Self::values(rest)?;
 
-        Ok((rest, InsertStatement { table, values }))
+        Ok((
+            rest,
+            InsertStatement {
+                table,
+                values,
+                columns: None,
+            },
+        ))
     }
 
     fn values_keyword(input: &[Token]) -> Result<(&[Token], ())> {
@@ -135,7 +120,21 @@ impl Parser {
         let (rest, columns) = Self::columns(rest)?;
         let (rest, _) = Self::from_keyword(rest)?;
         let (rest, table) = Self::table_name(rest)?;
-        Ok((rest, SelectStatement { columns, table }))
+        Ok((
+            rest,
+            SelectStatement {
+                selections: columns
+                    .into_iter()
+                    .map(|c| Selection {
+                        column: c,
+                        alias: None,
+                    })
+                    .collect(),
+                table,
+                r#where: None,
+                pagination: None,
+            },
+        ))
     }
 
     fn table_name(input: &[Token]) -> Result<(&[Token], String)> {

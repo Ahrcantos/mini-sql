@@ -1,17 +1,15 @@
 mod pager;
-mod parser;
 mod schema;
 mod table;
-mod tokenizer;
+mod sql;
 
 use std::{io::{self, Write}, path::PathBuf};
 
 use clap::Parser;
 
-use parser::Statement;
+use sql::{Statement, tokenizer::Tokenizer};
 use schema::{DatabaseSchema, TableSchema};
 use table::{Row, Table};
-use tokenizer::Tokenizer;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -87,7 +85,7 @@ fn main() {
 
 fn execute_sql(sql: &str, table: &mut Table) {
     let tokens = Tokenizer::parse(sql);
-    let parser = parser::Parser::new(tokens);
+    let parser = sql::parser::Parser::new(tokens);
     let statement = parser.parse();
 
     match statement {
@@ -105,7 +103,7 @@ fn execute_sql(sql: &str, table: &mut Table) {
             let username = stmt.values.get(1);
             let email = stmt.values.get(2);
 
-            use parser::Value;
+            use sql::Value;
 
             match (id, username, email) {
                 (
@@ -121,6 +119,7 @@ fn execute_sql(sql: &str, table: &mut Table) {
                 }
             };
         }
+        Ok(_) => eprintln!("Not implemented"),
         Err(_) => eprintln!("Invalid SQL"),
     }
 }
