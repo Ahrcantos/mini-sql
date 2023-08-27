@@ -84,7 +84,8 @@ fn main() {
 }
 
 fn execute_sql(sql: &str, table: &mut Table) {
-    let tokens = Tokenizer::parse(sql);
+    let tokenizer = Tokenizer::new(sql);
+    let tokens = tokenizer.parse();
     let parser = sql::parser::Parser::new(tokens);
     let statement = parser.parse();
 
